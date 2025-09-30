@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗺️ Mapa de Reportes GPS</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Bootstrap CSS para mejor diseño -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+        }
+        
+        .container-fluid {
+            padding: 20px;
+        }
+        
+        .main-title {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        #map {
+            height: 70vh;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 3px solid rgba(255,255,255,0.2);
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            #map {
+                height: 50vh;
+                margin-bottom: 20px;
+            }
+            
+            .container-fluid {
+                padding: 10px;
+            }
+
+            .stats-card, .photo-container {
+                margin: 10px 5px;
+            }
+
+            .main-title {
+                font-size: 1.5em;
+                margin-bottom: 15px;
+            }
+        }
+        
+        .stats-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 10px 0;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .photo-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .photo-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            background: white;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .photo-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .photo-item img {
+            max-width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2em;
+        }
+        
+        .btn-refresh {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5em;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .btn-refresh:hover {
+            transform: scale(1.1);
+            background: linear-gradient(45deg, #ee5a24, #ff6b6b);
+        }
+
+        /* Nuevo botón agregar (esquina izquierda inferior) */
+        .btn-add {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            background: linear-gradient(45deg, #38b000, #2d6a4f);
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.3em;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.2s ease;
+            z-index: 1000;
+        }
+        .btn-add:hover { transform: scale(1.06); }
+        
+        .marker-popup {
+            max-width: 300px;
+        }
+        
+        .marker-popup img {
+            max-width: 100%;
+            max-height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .stats-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .error-message, .success-message {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            animation: slideDown 0.3s ease-out;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            max-width: 90%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .error-message {
+            background: rgba(220, 53, 69, 0.95);
+            color: white;
+        }
+
+        .success-message {
+            background: rgba(40, 167, 69, 0.95);
+            color: white;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .loading-spinner {
+            animation: pulse 2s infinite;
+        }
+
+        /* Resalte para marcadores recientes */
+        .leaflet-marker-icon.highlight-marker {
+            animation: pulse 1.6s infinite;
+            transform-origin: center;
+            filter: drop-shadow(0 6px 8px rgba(0,0,0,0.25));
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <h1 class="main-title">
+            <i class="fas fa-map-marked-alt"></i>
+            Mapa de Reportes GPS
+        </h1>
+        
+        <div class="row">
+            <!-- Columna del mapa -->
+            <div class="col-lg-8">
+                <div id="map"></div>
+            </div>
+            
+            <!-- Columna de estadísticas y fotos -->
+            <div class="col-lg-4">
+                <!-- Estadísticas -->
+                <div class="stats-card">
+                    <h4><i class="fas fa-chart-bar text-primary"></i> Estadísticas</h4>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="stats-number" id="totalReportes">0</div>
+                            <small class="text-muted">Total Reportes</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="stats-number" id="reportesHoy">0</div>
+                            <small class="text-muted">Hoy</small>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <strong>Último reporte:</strong>
+                        <div id="ultimoReporte" class="text-muted">Cargando...</div>
+                    </div>
+                </div>
+                
+                <!-- Fotos de reportes -->
+                <div class="photo-container">
+                    <h5><i class="fas fa-camera text-primary"></i> Fotos Recientes</h5>
+                    <div id="photosContainer">
+                        <div class="loading loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            Cargando fotos...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Botón de actualizar -->
+    <button class="btn btn-refresh" onclick="cargarReportes()" title="Actualizar datos">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    <!-- Nuevo: Botón para agregar reporte -->
+    <button class="btn btn-add" onclick="abrirModalAgregar()" title="Agregar reporte">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Modal para ver fotos en grande -->
+    <div class="modal fade" id="photoModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Foto del Reporte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" src="" class="img-fluid" style="max-height: 70vh;">
+                    <div id="modalInfo" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nuevo: Modal para agregar reporte -->
+    <div class="modal fade" id="addReportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Agregar nuevo reporte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Tipo de reporte</label>
+                        <select id="inputTipo" class="form-select">
+                            <option value="otro">Otro</option>
+                            <option value="incidente">Incidente</option>
+                            <option value="obstruccion">Obstrucción</option>
+                            <option value="alerta">Alerta</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Descripción</label>
+                        <textarea id="inputDescripcion" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Coordenadas (seleccione en el mapa)</label>
+                        <div class="input-group">
+                            <input id="inputLat" class="form-control" placeholder="Latitud">
+                            <input id="inputLng" class="form-control" placeholder="Longitud">
+                        </div>
+                        <div class="form-text">Haga clic en "Seleccionar en mapa" y luego en el mapa para fijar la ubicación.</div>
+                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="activarSeleccionMapa()">Seleccionar en mapa</button>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Foto (opcional) - Formatos: JPG, PNG</label>
+                        <input id="inputFoto" type="file" accept="image/jpeg,image/png" class="form-control">
+                        <small class="form-text text-muted">Deje este campo vacío si no desea agregar una foto.</small>
+                    </div>
+                    <div id="addReportFeedback" class="text-danger small" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-primary" onclick="submitNuevoReporte()">Enviar reporte</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Configuración del mapa
+        const API_BASE_URL = window.location.origin; 
+        let map;
+        let markersGroup;
+        let markersById = {}; // Mapa id -> marker
+        let firstLoad = true;
+
+        // Inicializar el mapa
+        function initMap() {
+            map = L.map('map').setView([10.9639, -74.7964], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+            markersGroup = L.layerGroup().addTo(map);
+
+            // Listener de clic en el mapa: si estamos en modo selección, rellenar lat/lng y colocar marcador temporal.
+            map.on('click', function(e) {
+                if (!seleccionarCoords) return;
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                document.getElementById('inputLat').value = lat.toFixed(6);
+                document.getElementById('inputLng').value = lng.toFixed(6);
+                seleccionarCoords = false;
+                // marcador temporal (se elimina después)
+                if (tempMarkerForSelection) { markersGroup.removeLayer(tempMarkerForSelection); tempMarkerForSelection = null; }
+                tempMarkerForSelection = L.marker([lat, lng]).addTo(markersGroup);
+                setTimeout(()=>{ if (tempMarkerForSelection) { markersGroup.removeLayer(tempMarkerForSelection); tempMarkerForSelection = null; } }, 5000);
+            });
+        }
+        
+        // Cargar reportes desde la API
+        async function cargarReportes() {
+            try {
+                showLoading(true);
+                
+                const response = await fetch(`${API_BASE_URL}/reportes/`);
+                if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+                const reportes = await response.json();
+                
+                const statsResponse = await fetch(`${API_BASE_URL}/stats`);
+                const stats = statsResponse.ok ? await statsResponse.json() : null;
+                
+                actualizarMapa(reportes);
+                actualizarEstadisticas(stats, reportes);
+                actualizarFotos(reportes);
+                
+                showError(null);
+            } catch (error) {
+                console.error('Error al cargar reportes:', error);
+                showError(`Error al cargar datos: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Comprueba si boundsA contiene completamente a boundsB
+        function boundsContainsBounds(boundsA, boundsB) {
+            if (!boundsA || !boundsB) return false;
+            return boundsA.contains(boundsB.getSouthWest()) && boundsA.contains(boundsB.getNorthEast());
+        }
+
+
+        // Actualizar marcadores en el mapa (revertido a marcadores normales)
+        function actualizarMapa(reportes) {
+            // Guardar estado anterior (no se usa ampliamente pero se conserva)
+            const prevBounds = markersGroup.getBounds && markersGroup.getLayers().length ? markersGroup.getBounds() : null;
+
+            markersGroup.clearLayers();
+            // limpiar antiguos objectURLs si fuera necesario
+            Object.values(markersById).forEach(m => {
+                try { if (m._imageObjectUrl) URL.revokeObjectURL(m._imageObjectUrl); } catch(e) {}
+            });
+            markersById = {};
+
+            if (!reportes || reportes.length === 0) return;
+
+            const HIGHLIGHT_COUNT = 5;
+
+            reportes.forEach((reporte, index) => {
+                const lat = reporte.latitud;
+                const lng = reporte.longitud;
+                const isHighlighted = index < HIGHLIGHT_COUNT;
+
+                // Construir popup DOM
+                const popupDiv = document.createElement('div');
+                popupDiv.className = 'marker-popup';
+                const title = document.createElement('h6');
+                title.innerHTML = `<i class="fas fa-map-marker-alt text-danger"></i> Reporte #${reporte.id}`;
+                popupDiv.appendChild(title);
+
+                const fechaP = document.createElement('p');
+                fechaP.innerHTML = `<strong>Fecha:</strong> ${formatearFecha(reporte.timestamp)}`;
+                popupDiv.appendChild(fechaP);
+
+                const coordP = document.createElement('p');
+                coordP.innerHTML = `<strong>Coordenadas:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                popupDiv.appendChild(coordP);
+
+                if (reporte.descripcion) {
+                    const descP = document.createElement('p');
+                    descP.innerHTML = `<strong>Descripción:</strong> ${reporte.descripcion}`;
+                    popupDiv.appendChild(descP);
+                }
+
+                const tipoP = document.createElement('p');
+                tipoP.innerHTML = `<strong>Tipo:</strong> ${reporte.tipo_reporte}`;
+                popupDiv.appendChild(tipoP);
+
+                const imgPlaceholder = document.createElement('div');
+                if (reporte.foto_base64) {
+                    const img = document.createElement('img');
+                    // Si la columna ahora guarda la ruta relativa (imagenes_reportes/ID.jpg)
+                    if (reporte.foto_base64.startsWith('/') || reporte.foto_base64.startsWith('imagenes_reportes')) {
+                        img.src = reporte.foto_base64.startsWith('/') ? reporte.foto_base64 : '/' + reporte.foto_base64;
+                    } else {
+                        // Si por compatibilidad aún es base64, usar data URI
+                        img.src = `data:image/jpeg;base64,${reporte.foto_base64}`;
+                    }
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '150px';
+                    img.style.objectFit = 'cover';
+                    img.style.marginTop = '10px';
+                    img.style.cursor = 'pointer';
+                    img.addEventListener('click', function () {
+                        mostrarFotoModal(img.src, reporte.id, reporte.timestamp);
+                    });
+                    imgPlaceholder.appendChild(img);
+                }
+                popupDiv.appendChild(imgPlaceholder);
+
+                // Crear marcador normal (como antes)
+                const marker = L.marker([lat, lng]);
+                marker.bindPopup(popupDiv);
+                marker.addTo(markersGroup);
+
+                // Si es reciente, añadir clase CSS para resaltar (se aplica cuando elemento del icono exista)
+                if (isHighlighted) {
+                    marker.on('add', () => {
+                        const el = marker.getElement();
+                        if (el) el.classList.add('highlight-marker');
+                    });
+                    // Dar preferencia visual al estar encima
+                    marker.setZIndexOffset(1000);
+                }
+
+                markersById[reporte.id] = marker;
+            });
+
+            // Ajustar vista solo si los nuevos marcadores no están ya contenidos
+            try {
+                const layers = markersGroup.getLayers();
+                if (layers.length > 0) {
+                    const group = new L.featureGroup(layers);
+                    const newBounds = group.getBounds().pad(0.1);
+
+                    const currentBounds = map.getBounds ? map.getBounds() : null;
+                    const needFit = firstLoad || !boundsContainsBounds(currentBounds, newBounds);
+                    if (needFit) {
+                        map.fitBounds(newBounds);
+                        firstLoad = false;
+                    }
+                }
+            } catch (err) {
+                console.warn('Error ajustando bounds:', err);
+            }
+        }
+        
+        // Actualizar estadísticas
+        function actualizarEstadisticas(stats, reportes) {
+            const total = stats ? stats.total_reportes : reportes.length;
+            const hoy = contarReportesHoy(reportes);
+            const ultimo = stats ? stats.ultimo_reporte : (reportes.length > 0 ? reportes[0].timestamp : null);
+            
+            document.getElementById('totalReportes').textContent = total;
+            document.getElementById('reportesHoy').textContent = hoy;
+            document.getElementById('ultimoReporte').textContent = ultimo ? formatearFecha(ultimo) : 'Sin reportes';
+        }
+        
+        // Actualizar fotos (miniaturas) — al clicar centramos y abrimos popup
+        function actualizarFotos(reportes) {
+            const container = document.getElementById('photosContainer');
+            container.innerHTML = '';
+
+            if (!reportes || reportes.length === 0) {
+                container.innerHTML = '<p class="text-muted">No hay reportes con fotos</p>';
+                return;
+            }
+
+            const fotos = reportes.filter(r => r.foto_base64).slice(0, 5);
+            if (fotos.length === 0) {
+                container.innerHTML = '<p class="text-muted">No hay fotos disponibles</p>';
+                return;
+            }
+
+            fotos.forEach(reporte => {
+                const item = document.createElement('div');
+                item.className = 'photo-item';
+
+                const img = document.createElement('img');
+                img.alt = `Reporte #${reporte.id}`;
+                img.style.cursor = 'pointer';
+                // Usar la ruta como src
+                img.src = reporte.foto_base64.startsWith('/') ? reporte.foto_base64 : `/${reporte.foto_base64}`;
+                img.addEventListener('click', () => {
+                    mostrarFotoModal(img.src, reporte.id, reporte.timestamp);
+                });
+
+                item.appendChild(img);
+                container.appendChild(item);
+            });
+        }
+
+        // Mostrar modal con foto grande
+        function mostrarFotoModal(src, id, timestamp) {
+            const modalImage = document.getElementById('modalImage');
+            const modalInfo = document.getElementById('modalInfo');
+            modalImage.src = src;
+            modalInfo.textContent = `Reporte #${id} — ${timestamp ? formatearFecha(timestamp) : ''}`;
+            const bsModal = new bootstrap.Modal(document.getElementById('photoModal'), {});
+            bsModal.show();
+        }
+
+        // Contar reportes del día actual (local)
+        function contarReportesHoy(reportes) {
+            if (!reportes || reportes.length === 0) return 0;
+            const hoy = new Date();
+            return reportes.reduce((acc, r) => {
+                if (!r.timestamp) return acc;
+                const d = new Date(r.timestamp);
+                if (d.getFullYear() === hoy.getFullYear() &&
+                    d.getMonth() === hoy.getMonth() &&
+                    d.getDate() === hoy.getDate()) {
+                    return acc + 1;
+                }
+                return acc;
+            }, 0);
+        }
+
+        // Formatear fecha de forma legible
+        function formatearFecha(timestamp) {
+            if (!timestamp) return '';
+            try {
+                const d = new Date(timestamp);
+                return d.toLocaleString('es-CO', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return timestamp;
+            }
+        }
+
+        // Mostrar / ocultar indicador de carga simple
+        function showLoading(enabled) {
+            const btn = document.querySelector('.btn-refresh');
+            if (btn) btn.disabled = !!enabled;
+            if (enabled) document.body.classList.add('loading');
+            else document.body.classList.remove('loading');
+        }
+
+        // Mostrar mensajes de error/éxito
+        function showMessage(message, type = 'error') {
+            const container = document.querySelector('.container-fluid');
+            const id = type === 'error' ? 'errorBox' : 'successBox';
+            const className = type === 'error' ? 'error-message' : 'success-message';
+            let box = document.getElementById(id);
+            if (!box && message) {
+                box = document.createElement('div');
+                box.id = id;
+                box.className = className;
+                container.insertBefore(box, container.firstChild);
+            }
+            if (box) {
+                if (message) {
+                    box.textContent = message;
+                    if (type === 'success') setTimeout(() => box.remove(), 3000);
+                } else {
+                    box.remove();
+                }
+            }
+        }
+
+        function showError(message) { showMessage(message, 'error'); }
+        function showSuccess(message) { showMessage(message, 'success'); }
+
+        // Convierte un File a base64 (Promise)
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) resolve(null);
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Enviar nuevo reporte al backend
+        async function submitNuevoReporte() {
+            const tipo = document.getElementById('inputTipo').value || 'otro';
+            const descripcion = document.getElementById('inputDescripcion').value || '';
+            const lat = parseFloat(document.getElementById('inputLat').value);
+            const lng = parseFloat(document.getElementById('inputLng').value);
+            const file = document.getElementById('inputFoto').files[0];
+            const feedback = document.getElementById('addReportFeedback');
+
+            if (!lat || !lng || Number.isNaN(lat) || Number.isNaN(lng)) {
+                if (feedback) { feedback.style.display = 'block'; feedback.textContent = 'Seleccione las coordenadas en el mapa.'; }
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const fotoBase64 = file ? await fileToBase64(file) : null;
+
+                const payload = {
+                    latitud: lat,
+                    longitud: lng,
+                    descripcion: descripcion,
+                    tipo_reporte: tipo,
+                    foto_base64: fotoBase64 || ""
+                };
+
+                const res = await fetch(`${API_BASE_URL}/reportes/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const text = await res.text().catch(()=>null);
+                    throw new Error(text || `Error ${res.status}`);
+                }
+
+                const nuevoReporte = await res.json();
+
+                const bsModalEl = document.getElementById('addReportModal');
+                const bsModal = bootstrap.Modal.getInstance(bsModalEl);
+                if (bsModal) bsModal.hide();
+
+                showSuccess('Reporte creado exitosamente');
+                await cargarReportes();
+
+                if (map && nuevoReporte) {
+                    map.setView([nuevoReporte.latitud, nuevoReporte.longitud], 15, { animate: true, duration: 1 });
+                }
+            } catch (err) {
+                console.error('Error enviando reporte:', err);
+                if (feedback) { feedback.style.display = 'block'; feedback.textContent = 'Error al enviar el reporte.'; }
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Inicializar y cargar al abrir
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            cargarReportes();
+        });
+
+        // Variables auxiliares para la selección en mapa
+        let seleccionarCoords = false;
+        let tempMarkerForSelection = null;
+    </script>
+</body>
+</html>
